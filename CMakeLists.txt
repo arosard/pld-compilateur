@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 14)
 include_directories(compiler)
 include_directories(tests/unit_testing)
 include_directories(tests/unit_testing/test_gen_asm)
+include_directories(/usr/include/antlr4-runtime)
 
 add_executable(pld_compilateur
         compiler/BasicBlock.cpp
