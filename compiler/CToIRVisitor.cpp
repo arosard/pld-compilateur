@@ -259,66 +259,68 @@ antlrcpp::Any CToIRVisitor::visitExprNOT(ifccParser::ExprNOTContext *ctx) {
 }
 
 antlrcpp::Any CToIRVisitor::visitExprLAND(ifccParser::ExprLANDContext *ctx) {
-    string leftResultIndex = visit(ctx->expression()[0]);
-    cfg->current_bb->test_var_index = stoi(leftResultIndex);
-
-    auto *bbTest = cfg->current_bb;
+    auto *bbTrueResult = new BasicBlock(cfg, cfg->new_BB_name("land_true_result"));
     auto *bbTrue = new BasicBlock(cfg, cfg->new_BB_name("land_true"));
     auto *bbOut = new BasicBlock(cfg, cfg->new_BB_name("land_out"));
     bbOut->exit_true = cfg->current_bb->exit_true;
     bbOut->exit_false = cfg->current_bb->exit_false;
 
+    cfg->add_bb(bbTrueResult);
     cfg->add_bb(bbTrue);
     cfg->add_bb(bbOut);
 
     string result = cfg->create_new_tempvar(INT);
     string resultIndex = to_string(cfg->get_var_index(result));
-    string tempVariable = cfg->create_new_tempvar(INT);
-    string tempVariableIndex = to_string(cfg->get_var_index(tempVariable));
-    bbTest->add_IRInstr(ldconst, {tempVariableIndex, "1"});
-    bbTest->exit_true = bbTrue;
-    bbTest->exit_false = bbOut;
-    bbTest->add_IRInstr(copyvar, {resultIndex, leftResultIndex});
-    bbTest->add_IRInstr(bwand, {resultIndex, resultIndex, tempVariableIndex});
 
-    bbTrue->exit_true =  bbOut;
+    cfg->current_bb->add_IRInstr(ldconst, {resultIndex, "0"});
+    string leftResultIndex = visit(ctx->expression()[0]);
+    cfg->current_bb->test_var_index = stoi(leftResultIndex);
+    cfg->current_bb->exit_true = bbTrue;
+    cfg->current_bb->exit_false = bbOut;
+
     cfg->current_bb = bbTrue;
     string rightResultIndex = visit(ctx->expression()[1]);
-    cfg->current_bb->add_IRInstr(copyvar, {resultIndex, rightResultIndex});
-    cfg->current_bb->add_IRInstr(bwand, {resultIndex, resultIndex, tempVariableIndex});
+    cfg->current_bb->test_var_index = stoi(rightResultIndex);
+    cfg->current_bb->exit_true = bbTrueResult;
+    cfg->current_bb->exit_false = bbOut;
+
+    cfg->current_bb = bbTrueResult;
+    cfg->current_bb->add_IRInstr(ldconst, {resultIndex, "1"});
+    cfg->current_bb->exit_true = bbOut;
+
     cfg->current_bb = bbOut;
 
     return resultIndex;
 }
 
 antlrcpp::Any CToIRVisitor::visitExprLOR(ifccParser::ExprLORContext *ctx) {
-    string leftResultIndex = visit(ctx->expression()[0]);
-    cfg->current_bb->test_var_index = stoi(leftResultIndex);
-
-    auto *bbTest = cfg->current_bb;
     auto *bbFalse = new BasicBlock(cfg, cfg->new_BB_name("lor_false"));
+    auto *bbTrueResult = new BasicBlock(cfg, cfg->new_BB_name("lor_true_result"));
     auto *bbOut = new BasicBlock(cfg, cfg->new_BB_name("lor_out"));
+    cfg->add_bb(bbFalse);
+    cfg->add_bb(bbTrueResult);
+    cfg->add_bb(bbOut);
     bbOut->exit_true = cfg->current_bb->exit_true;
     bbOut->exit_false = cfg->current_bb->exit_false;
 
-    cfg->add_bb(bbFalse);
-    cfg->add_bb(bbOut);
-
     string result = cfg->create_new_tempvar(INT);
     string resultIndex = to_string(cfg->get_var_index(result));
-    string tempVariable = cfg->create_new_tempvar(INT);
-    string tempVariableIndex = to_string(cfg->get_var_index(tempVariable));
-    bbTest->add_IRInstr(ldconst, {tempVariableIndex, "1"});
-    bbTest->exit_true = bbOut;
-    bbTest->exit_false = bbFalse;
-    bbTest->add_IRInstr(copyvar, {resultIndex, leftResultIndex});
-    bbTest->add_IRInstr(bwand, {resultIndex, resultIndex, tempVariableIndex});
 
-    bbFalse->exit_true = bbOut;
+    cfg->current_bb->add_IRInstr(ldconst, {resultIndex, "0"});
+    string leftResultIndex = visit(ctx->expression()[0]);
+    cfg->current_bb->test_var_index = stoi(leftResultIndex);
+    cfg->current_bb->exit_true = bbTrueResult;
+    cfg->current_bb->exit_false = bbFalse;
+
     cfg->current_bb = bbFalse;
     string rightResultIndex = visit(ctx->expression()[1]);
-    cfg->current_bb->add_IRInstr(copyvar, {resultIndex, rightResultIndex});
-    cfg->current_bb->add_IRInstr(bwand, {resultIndex, resultIndex, tempVariableIndex});
+    cfg->current_bb->test_var_index = stoi(rightResultIndex);
+    cfg->current_bb->exit_true = bbTrueResult;
+    cfg->current_bb->exit_false = bbOut;
+
+    cfg->current_bb = bbTrueResult;
+    cfg->current_bb->add_IRInstr(ldconst, {resultIndex, "1"});
+    cfg->current_bb->exit_true = bbOut;
 
     cfg->current_bb = bbOut;
 
