@@ -72,12 +72,16 @@ orig_cwd=os.getcwd()
 if "ifcc-test-output" in orig_cwd:
     print('error: cannot run from within the output directory')
     exit(1)
-    
+
+print("Cleaning up previous output directory...")
+
 if os.path.isdir('ifcc-test-output'):
     # cleanup previous output directory
     command('rm -rf ifcc-test-output')
 os.mkdir('ifcc-test-output')
-    
+
+print("Start running tests...")
+
 ## Then we process the inputs arguments i.e. filenames or subtrees
 inputfilenames=[]
 for path in args.input:

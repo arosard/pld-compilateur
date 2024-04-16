@@ -35,6 +35,7 @@ typedef enum
     decr    = 25,
     bwsl    = 26,
     bwsr    = 27,
+    ret_cst = 28,
 } Operation;
 
 #endif // PLD_COMP_OPERATION_H

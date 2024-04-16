@@ -14,13 +14,16 @@ protected:
     static void constantVariableOptimization(BasicBlock* bb);
     static void unusedVariables(CFG* cfg);
     static void deadCodeRemoval(BasicBlock* bb);
-    static void optimizeCFG(CFG *cfg);
+    static void optimizeCFG(CFG* cfg);
+    static void bypassEmptyIntermediateBlocks(CFG* cfg);
+    static void removeUnusedBasicBlocks(CFG* cfg);
+    static void mergeBasicBlocks(CFG* cfg);
     static bool reduce(BasicBlock *bb, int index, int value, IRInstr* instr, map<string, string>* constVars);
     vector<CFG*>* cfgs;
 
 
     void replaceJumpInstructions() const;
-
     void simplifyConditionnalBlockJump() const;
+    void removeExitWhenReturn() const;
 };
 

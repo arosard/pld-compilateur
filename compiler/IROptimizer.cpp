@@ -5,7 +5,7 @@ IROptimizer::IROptimizer(vector<CFG *> *cfgList) :
     cfgs(cfgList) {}
 
 void IROptimizer::optimize() const{
-    for (auto cfg : *cfgs) {
+    for(auto cfg : *cfgs){
         for (auto bb: *cfg->bbs) {
             deadCodeRemoval(bb);
             constantVariableOptimization(bb);
@@ -13,12 +13,12 @@ void IROptimizer::optimize() const{
         unusedVariables(cfg);
     }
     replaceJumpInstructions();
+    removeExitWhenReturn();
     simplifyConditionnalBlockJump();
     for (auto cfg : *cfgs){
-        optimizeCFG(cfg);
+        //optimizeCFG(cfg);
     }
 }
-
 
 void IROptimizer::deadCodeRemoval(BasicBlock *bb) {
     bool hasChanged = true;
@@ -27,7 +27,7 @@ void IROptimizer::deadCodeRemoval(BasicBlock *bb) {
         for (long unsigned i = 0; i + 1 < bb->instrs->size(); i++) {
             IRInstr *instr1 = (*bb->instrs)[i];
 
-            if ((instr1->op == jump or instr1->op == ret)) {
+            if ((instr1->op == jump or instr1->op == ret or instr1->op == ret_cst)) {
                 bb->instrs->erase(bb->instrs->begin() +i+1, bb->instrs->begin() +i+2);
                 hasChanged = true;
             }
@@ -36,42 +36,9 @@ void IROptimizer::deadCodeRemoval(BasicBlock *bb) {
 }
 
 void IROptimizer::optimizeCFG(CFG* cfg){
-    bool hasChanged = true;
-    for (auto bb: *cfg->bbs) {
-        hasChanged = true;
-        while (hasChanged) {
-            hasChanged = false;
-            if (bb->exit_true != nullptr && bb->exit_true->instrs->empty() && bb->exit_true->exit_false == nullptr) {
-                bb->exit_true = bb->exit_true->exit_true;
-                hasChanged = true;
-            }
-            if (bb->exit_false != nullptr && bb->exit_false->instrs->empty() && bb->exit_false->exit_false == nullptr) {
-                bb->exit_false = bb->exit_false->exit_true;
-                hasChanged = true;
-            }
-        }
-    }
-    for (long unsigned i = 1; i < cfg->bbs->size(); i++) {
-        bool toRemove = true;
-        BasicBlock *bb = (*cfg->bbs)[i];
-        for (auto bb2: *cfg->bbs) {
-            if (bb == bb2) continue;
-            if (bb2->exit_true == bb || bb2->exit_false == bb) {
-                toRemove = false;
-                break;
-            }
-            for (auto instr: *bb2->instrs)
-                if (instr->op == jump && instr->params[0] == bb->label) {
-                    toRemove = false;
-                    break;
-                }
-            if (!toRemove) break;
-        }
-        if (toRemove) {
-            cfg->bbs->erase(cfg->bbs->begin() + i);
-            i--;
-        }
-    }
+    bypassEmptyIntermediateBlocks(cfg);
+    removeUnusedBasicBlocks(cfg);
+    mergeBasicBlocks(cfg);
 }
 
 void IROptimizer::constantVariableOptimization(BasicBlock* bb) {
@@ -87,6 +54,8 @@ void IROptimizer::constantVariableOptimization(BasicBlock* bb) {
                 if (constVars->find(instr->params[0]) == constVars->end()) {
                     // mémorisation d'un ldconst
                     constVars->insert({instr->params[0], instr->params[1]});
+                } else {
+                    (*constVars)[instr->params[0]] = instr->params[1];
                 }
                 break;
 
@@ -365,6 +334,7 @@ void IROptimizer::simplifyConditionnalBlockJump() const{
                         if (stoi((*it)->params[1]) == 0)
                             bb->exit_true = bb->exit_false;
                         bb->exit_false = nullptr;
+                        break;
                     }
 }
 
@@ -388,4 +358,80 @@ void IROptimizer::replaceJumpInstructions() const {
                 bb->exit_true = cfg->find_bb_by_name(bb_label);
                 bb->instrs->pop_back();
             }
+}
+
+void IROptimizer::removeExitWhenReturn() const {
+    for (auto cfg: *cfgs)
+        for (auto bb: *cfg->bbs)
+            if (!bb->instrs->empty() && (bb->instrs->back()->op == ret || bb->instrs->back()->op == ret_cst)){
+                bb->exit_false = nullptr;
+                bb->exit_true = nullptr;
+            }
+}
+
+void IROptimizer::mergeBasicBlocks(CFG* cfg) {
+    map<BasicBlock*, int> callsByBB;
+    for (auto bb : *cfg->bbs){
+        if (bb->exit_true != nullptr)
+            callsByBB[bb->exit_true] += 1;
+        if (bb->exit_false != nullptr)
+            callsByBB[bb->exit_false] += 1;
+    }
+    for (long unsigned i = 0; i < cfg->bbs->size(); i++) {
+        BasicBlock *bb = (*cfg->bbs)[i];
+        if (callsByBB[bb->exit_true] == 1 && bb->exit_false == nullptr) {
+            for (auto instr: *bb->exit_true->instrs)
+                bb->instrs->push_back(instr);
+            for (auto it = cfg->bbs->begin(); it != cfg->bbs->end(); it++)
+                if (*it == bb->exit_true) {
+                    cfg->bbs->erase(it);
+                    break;
+                }
+            bb->test_var_index = bb->exit_true->test_var_index;
+            bb->exit_false = bb->exit_true->exit_false;
+            bb->exit_true = bb->exit_true->exit_true;
+            i--;
+        }
+    }
+}
+
+void IROptimizer::removeUnusedBasicBlocks(CFG *cfg) {
+    for (long unsigned i = 1; i < cfg->bbs->size(); i++) {
+        bool toRemove = true;
+        BasicBlock *bb = (*cfg->bbs)[i];
+        for (auto bb2: *cfg->bbs) {
+            if (bb == bb2) continue;
+            if (bb2->exit_true == bb || bb2->exit_false == bb) {
+                toRemove = false;
+                break;
+            }
+            for (auto instr: *bb2->instrs)
+                if (instr->op == jump && instr->params[0] == bb->label) {
+                    toRemove = false;
+                    break;
+                }
+            if (!toRemove) break;
+        }
+        if (toRemove) {
+            cfg->bbs->erase(cfg->bbs->begin() + i);
+            i--;
+        }
+    }
+}
+
+void IROptimizer::bypassEmptyIntermediateBlocks(CFG *cfg) {
+    for (auto bb: *cfg->bbs) {
+        bool hasChanged = true;
+        while (hasChanged) {
+            hasChanged = false;
+            if (bb->exit_true != nullptr && bb->exit_true->instrs->empty() && bb->exit_true->exit_false == nullptr) {
+                bb->exit_true = bb->exit_true->exit_true;
+                hasChanged = true;
+            }
+            if (bb->exit_false != nullptr && bb->exit_false->instrs->empty() && bb->exit_false->exit_false == nullptr) {
+                bb->exit_false = bb->exit_false->exit_true;
+                hasChanged = true;
+            }
+        }
+    }
 }
