@@ -16,7 +16,7 @@ void IROptimizer::optimize() const{
     removeExitWhenReturn();
     simplifyConditionnalBlockJump();
     for (auto cfg : *cfgs){
-        //optimizeCFG(cfg);
+        optimizeCFG(cfg);
     }
 }
 
