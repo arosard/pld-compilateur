@@ -45,3 +45,4 @@ compiler/.antlr/*
 /tests/ifcc-test-output/
 tests/unit_testing/build/*
 .idea/
+/cmake-build-debug/*
