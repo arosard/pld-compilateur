@@ -15,11 +15,11 @@
 #
 
 import argparse
-import glob
 import os
 import shutil
 import sys
 import subprocess
+from colorama import Fore
 
 def command(string, logfile=None):
     """execute `string` as a shell command, optionnaly logging stdout+stderr to a file. return exit status.)"""
@@ -87,7 +87,7 @@ inputfilenames=[]
 for path in args.input:
     path=os.path.normpath(path) # collapse redundant slashes etc.
     if os.path.isfile(path):
-        if path[-2:] == '.c':
+        if path.endswith('.c'):
             inputfilenames.append(path)
         else:
             print("error: incorrect filename suffix (should be '.c'): "+path)
@@ -166,7 +166,8 @@ if args.debug:
     print("debug: list of test-cases after deduplication:"," ".join(jobs))
 
 passedTest = 0;
-
+nbLignesTotalIfcc = 0
+nbLignesTotalGcc = 0
 ######################################################################################
 ## TEST step: actually compile all test-cases with both compilers
 
@@ -178,6 +179,8 @@ for jobname in jobs:
     gccstatus=command("gcc -S -o asm-gcc.s input.c", "gcc-compile.txt")
     if gccstatus == 0:
         # test-case is a valid program. we should run it
+        with open(orig_cwd + '/' + jobname + "/asm-gcc.s", 'r') as file:
+            nbLignesTotalGcc += len(file.readlines()) -26
         gccstatus=command("gcc -o exe-gcc asm-gcc.s", "gcc-link.txt")
     if gccstatus == 0: # then both compile and link stage went well
         exegccstatus=command("./exe-gcc", "gcc-execute.txt")
@@ -186,7 +189,6 @@ for jobname in jobs:
             
     ## IFCC compiler
     ifccstatus=command(wrapper+" asm-ifcc.s input.c", "ifcc-compile.txt")
-    
     if gccstatus != 0 and ifccstatus != 0:
         ## ifcc correctly rejects invalid program -> test-case ok
         if args.ok:
@@ -208,6 +210,8 @@ for jobname in jobs:
         continue
     else:
         ## ifcc accepts to compile valid program -> let's link it
+        with open("asm-ifcc.s", 'r') as file:
+            nbLignesTotalIfcc += len(file.readlines())
         ldstatus=command("gcc -o exe-ifcc asm-ifcc.s", "ifcc-link.txt")
         if ldstatus:
             print('TEST-CASE: '+jobname)
@@ -236,4 +240,8 @@ for jobname in jobs:
         print("TEST OK")
     passedTest += 1
 
-print("----------------\nTest results :\n " + str(passedTest) + " passed | " + str(len(jobs) - passedTest) + " failed | total " + str(len(jobs)))
+print("----------------\nTest results :" )
+print(Fore.GREEN + str(passedTest) + " passed", "green", end=Fore.RESET+" | ")
+print(Fore.RED + str(len(jobs) - passedTest) + " failed", end=Fore.RESET+" | ")
+print("total " + str(len(jobs)))
+print("Assembly lines generated :\n" + str(nbLignesTotalIfcc) + " (ifcc) | " + str(nbLignesTotalGcc) + " (gcc)")
