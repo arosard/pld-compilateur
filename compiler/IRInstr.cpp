@@ -3,13 +3,19 @@
 #include <utility>
 #include "BasicBlock.h"
 
-IRInstr::IRInstr(const BasicBlock *bb_, Operation op, vector<string> params) :
-    bb(bb_),
-    op(op),
-    params(std::move(params)) {}
+IRInstr::IRInstr(const BasicBlock *bb_, Operation op, vector<string> params) : bb(bb_),
+                                                                               op(op),
+                                                                               params(std::move(params)) {}
 
 void IRInstr::gen_asm(ostream &o)
 {
+    // Piece of code useful for debug
+    // o << "    # op " << op << " with parameters : ";
+    // for (auto &param : params)
+    // {
+    //     o << " " << param;
+    // }
+    // o << "\n";
     switch (op)
     {
     case ldconst:
@@ -66,46 +72,47 @@ void IRInstr::gen_asm(ostream &o)
         break;
     case call:
         // P0 = call P1(P2,...,Pn)
-        for (unsigned long i = 2; i<params.size(); i++) {
-            switch(i) {
-                case 2:
-                    o << "    movl    " << params[i] << "(%rbp), %edi\n";
+        for (unsigned long i = 2; i < params.size(); i++)
+        {
+            switch (i)
+            {
+            case 2:
+                o << "    movl    " << params[i] << "(%rbp), %edi\n";
                 break;
 
-                case 3:
-                    o << "    movl    " << params[i] << "(%rbp), %esi\n";
+            case 3:
+                o << "    movl    " << params[i] << "(%rbp), %esi\n";
                 break;
 
-                case 4:
-                    o << "    movl    " << params[i] << "(%rbp), %edx\n";
+            case 4:
+                o << "    movl    " << params[i] << "(%rbp), %edx\n";
                 break;
 
-                case 5:
-                    o << "    movl    " << params[i] << "(%rbp), %ecx\n";
+            case 5:
+                o << "    movl    " << params[i] << "(%rbp), %ecx\n";
                 break;
 
-                case 6:
-                    o << "    movl    " << params[i] << "(%rbp), %r8d\n";
+            case 6:
+                o << "    movl    " << params[i] << "(%rbp), %r8d\n";
                 break;
 
-                case 7:
-                    o << "    movl    " << params[i] << "(%rbp), %r9d\n";
+            case 7:
+                o << "    movl    " << params[i] << "(%rbp), %r9d\n";
                 break;
 
-                default:
-                    o << "    subq $4" <<", %rsp\n";
-                    o << "    movl " << params[params.size()-1+8-i] << "(%rbp), %eax\n";
-                    o << "    movl %eax, (%rsp)\n";
+            default:
+                o << "    subq $4" << ", %rsp\n";
+                o << "    movl " << params[params.size() - 1 + 8 - i] << "(%rbp), %eax\n";
+                o << "    movl %eax, (%rsp)\n";
                 break;
-                
             }
-            
         }
-        
+
         o << "    call    " << params[1] << "\n";
         o << "    movl    %eax, " << params[0] << "(%rbp)\n";
 
-        for(unsigned long i = params.size()-1; i>=8; i--) {
+        for (unsigned long i = params.size() - 1; i >= 8; i--)
+        {
             o << "    addq $4" << ", %rsp \n";
         }
         break;
